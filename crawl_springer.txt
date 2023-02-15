@@ -1,0 +1,114 @@
+import pandas as pd        #writes the header of csv file
+import csv
+
+head = ['JOURNAL_TITLE','VOLUME AND ISSUE NUMBER','ARTICLE_TITLE','PUBLISHED_DATE','ACCEPTED_DATE','SUBMITTED_DATE','PUBLISHED_DATE']
+with open("dats.csv","w") as files:
+    dw = csv.DictWriter(files,delimiter=',',fieldnames=head)
+    dw.writeheader()
+
+
+
+
+import csv
+import pandas as pd
+import numpy
+import requests
+from bs4 import BeautifulSoup
+import re
+from urllib.parse import urljoin
+
+base = 'https://link.springer.com/'     #base url
+
+pages_crawled = []
+def crawler(url):
+    page = requests.get(url)           #starting page after applying filter 
+    soup = BeautifulSoup(page.text,'html.parser')
+    links = soup.findAll(attrs = {'class': 'title'})
+    #print(links)
+    
+    
+    
+    for link in links:              #journals links
+        if 'href' in link.attrs:
+            #print(link.text)       
+            journals1 = link['href']   #prints all journal names on page 1
+            journals2 = base+journals1
+            journals = re.split(' ',journals2)
+            #print(journals1)
+            
+            for journal in journals:     #volumes and issues links
+                vol_button = journal+f"/volumes-and-issues"
+                volumes = re.split(' ',vol_button)      #converts into array of volume links
+            #print(vol_list)
+                
+            for volume in volumes:           #volume links
+                vol_page = requests.get(volume)
+                vol_html = BeautifulSoup(vol_page.text,'html.parser')
+                issues = vol_html.findAll(attrs = {'class': 'u-interface-link u-text-sans-serif u-text-sm'})
+                #print(issues)
+                
+                for issue in issues:        #issueslinks
+                    if 'href' in issue.attrs:
+                        issue_half = issue['href']
+                        issue_full = base+issue_half
+                        new_issues = re.split(' ',issue_full)       #converts into array of issue links
+                        #print(issue_full)
+                        
+                        for new_issue in new_issues:                 #article links
+                            issue_page = requests.get(new_issue)
+                            issue_html = BeautifulSoup(issue_page.text,'html.parser')
+                            #print(new_issue)
+                            
+                            journal_title = f'{issue_html.title.text}'
+                            #print(journal_title)
+                            
+                            number = issue_html.findAll(attrs = {'class': 'app-volumes-and-issues__copy'})
+                            number_of_article = number[0].text
+                            #print(number_of_article)
+                            
+                            articles = issue_html.findAll(attrs = {'data-track-action': 'clicked article'})
+
+                            
+                            for article in articles:
+                                if 'href' in article.attrs:
+                                    #print(article.attrs)
+                                    new_art1 = article['href']          #get the link stored as value in href attribute
+                                    new_articles = re.split(' ',new_art1)        #converts into array of article links
+                                    #print(new_articles)
+                                    
+                                    for new_article in new_articles:                      
+                                        if new_article not in pages_crawled:
+                                            pages_crawled.append(new_article)
+                                            art_page = requests.get(new_article)
+                                            art_html = BeautifulSoup(art_page.text,'html.parser')
+                                            
+                                            date = art_html.findAll('time')         #getting dates from articles
+                                            
+                                            try:
+                                                with open('dats.csv','a') as file:
+                                                    filer = csv.writer(file)
+                                                    data=[journal_title,number_of_article]
+                                                    data.append(art_html.title.text)
+                            
+                                                    for date_o in date:
+                                                        dates_o=date_o.findAll(text=True)
+                                                        data.append(dates_o[0])
+                                
+                                                    #print(art_html.title.text)
+                                                    print(data)
+                            
+                           
+                                                    if len(data)!=0:
+                                                        filer = csv.writer(file)
+                                                        filer.writerow(data)
+                                                        
+                           
+                                                
+                                                
+                                            except:
+                                                continue
+
+                
+
+
+crawler('https://link.springer.com/search?facet-content-type=Journal&facet-language=En&facet-sub-discipline=Computer+Systems+Organization+and+Communication+Networks&facet-discipline=Computer+Science')
