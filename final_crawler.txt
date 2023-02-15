@@ -1,0 +1,113 @@
+import csv
+import pandas as pd
+import numpy
+import requests
+from bs4 import BeautifulSoup
+import re
+from urllib.parse import urljoin
+base = 'https://link.springer.com/'
+
+pages_crawled = []
+def crawler(url):
+    page = requests.get(url)
+    soup = BeautifulSoup(page.text,'html.parser')
+    links = soup.findAll(attrs = {'class': 'title'})
+    date = soup.findAll('time')
+    #print(links)
+    
+    
+    
+    for link in links:              #journals links
+        if 'href' in link.attrs:
+            #print(link.text)       #prints all journal names on page 1
+            journals1 = link['href']
+            journals = base+journals1
+            lists = re.split(' ',journals)
+            #print(journals1)
+            
+            for list in lists:     #volumes and issues links
+                volumes = list+f"/volumes-and-issues"
+                vol_list = re.split(' ',volumes)
+            #print(vol_list)
+                
+            for volume in vol_list:           #issueslinks
+                vol = requests.get(volume)
+                vol_html = BeautifulSoup(vol.text,'html.parser')
+                #print(f'{soup.title.text}')
+                issues = vol_html.findAll(attrs = {'class': 'u-interface-link u-text-sans-serif u-text-sm'})
+                #print(issues)
+                for issue in issues:
+                    if 'href' in issue.attrs:
+                        issue_half = issue['href']
+                        issue_full = base+issue_half
+                        new_issue = re.split(' ',issue_full)
+                        #print(issue_full)
+                        
+                        for article in new_issue:                 #article links
+                            art = requests.get(article)
+                            art_html = BeautifulSoup(art.text,'html.parser')
+                            #print(article)
+                            print(f'{art_html.title.text}')
+                            number = art_html.findAll(attrs = {'class': 'app-volumes-and-issues__copy'})
+                            numb = number[0].text
+                            print(numb)
+                            arts = art_html.findAll(attrs = {'data-track-action': 'clicked article'})
+                            try:
+                                with open('dater.csv','a') as file:
+                                    data=[art_html.title.text,numb]
+                                    
+                                    filer = csv.writer(file)
+                                    #dates.append(art_html.title.text)
+                                    #dates.append(numb)
+                                    filer.writerow(data)
+                                    
+                            except:
+                                continue
+                            
+                                
+                            for art in arts:
+                                if 'href' in art.attrs:
+                                    #print(art.attrs)
+                                    new_link1 = art['href']
+                                    new_link = re.split(' ',new_link1)
+                                    #print(new_link)
+                                    
+                                    for a in new_link:                      #getting dates from articles
+                                        if a not in pages_crawled:
+                                            pages_crawled.append(a)
+                                            a_html = requests.get(a)
+                                            a_parse = BeautifulSoup(a_html.text,'html.parser')
+                                            
+                                            date = a_parse.findAll('time')
+                                            
+                                            try:
+                                                with open('dater.csv','a') as file:
+                                                    dates=[]
+                                                    filer = csv.writer(file)
+                                                    dates.append(a_parse.title.text)
+                            
+                                                    for date_o in date:
+                                
+                                                        dates_o=date_o.findAll(text=True)
+                                                        dates.append(dates_o[0])
+                                
+                                                    print(a_parse.title.text)
+                                                    print(dates)
+                            
+                           
+                                                    if len(dates)!=0:
+                                                        filer.writerow(dates)
+                                                        #file.write(f'{art_html.title.text};{numb};{a_parse.title.text};{dates}\n')
+                                                        #print(f'{soup.title.text};{dates}\n')
+                           
+                       
+                                                
+                                            except:
+                                                continue
+
+                
+    
+
+crawler('https://link.springer.com/search?facet-content-type=Journal&facet-language=En&facet-sub-discipline=Computer+Systems+Organization+and+Communication+Networks&facet-discipline=Computer+Science')
+ 
+   
